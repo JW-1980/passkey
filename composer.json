@@ -1,0 +1,49 @@
+{
+    "name": "jw-1980/passkey",
+    "description": "Passkey (WebAuthn) relying-party server for PHP, with a Laravel bridge and a desktop sign-in handoff.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.3",
+        "ext-json": "*",
+        "ext-openssl": "*",
+        "ext-pdo": "*",
+        "web-auth/webauthn-lib": "^5.3"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.18",
+        "orchestra/testbench": "^10.0|^11.0",
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^11.5|^12.0"
+    },
+    "suggest": {
+        "laravel/framework": "For the Laravel bridge (^12.0|^13.0)."
+    },
+    "autoload": {
+        "psr-4": {
+            "Jw1980\\Passkey\\": "packages/php/src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Jw1980\\Passkey\\Tests\\": "packages/php/tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Jw1980\\Passkey\\Laravel\\PasskeyServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "cd packages/php && vendor/bin/phpunit",
+        "stan": "cd packages/php && vendor/bin/phpstan analyse --no-progress",
+        "fix": "cd packages/php && vendor/bin/pint"
+    },
+    "config": {
+        "sort-packages": true,
+        "vendor-dir": "packages/php/vendor"
+    },
+    "minimum-stability": "stable"
+}

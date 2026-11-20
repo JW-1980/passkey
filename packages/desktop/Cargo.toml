@@ -1,0 +1,13 @@
+[package]
+name = "passkey-desktop"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Desktop side of the passkey sign-in handoff: system browser, loopback redirect and PKCE (RFC 8252, RFC 7636)."
+license = "LicenseRef-Proprietary"
+publish = false
+
+[dependencies]
+base64 = "0.22"
+getrandom = "0.2"
+sha2 = "0.10"

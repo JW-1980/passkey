@@ -1,0 +1,8 @@
+node_modules/
+vendor/
+dist/
+target/
+composer.lock
+.phpunit.cache/
+.phpunit.result.cache
+*.log

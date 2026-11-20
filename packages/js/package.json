@@ -1,0 +1,44 @@
+{
+  "name": "@jw-1980/passkey",
+  "version": "0.1.0",
+  "description": "Passkey client for the browser, React Native and bridged webviews; talks to the jw-1980/passkey server.",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "default": "./dist/browser.js"
+    },
+    "./bridge": {
+      "types": "./dist/bridge.d.ts",
+      "default": "./dist/bridge.js"
+    },
+    "./handoff": {
+      "types": "./dist/handoff.d.ts",
+      "default": "./dist/handoff.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "build:example": "esbuild ../../examples/plain-php/src/app.ts --bundle --format=esm --target=es2022 --outfile=../../examples/plain-php/public/app.js"
+  },
+  "dependencies": {
+    "@simplewebauthn/browser": "^14.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
