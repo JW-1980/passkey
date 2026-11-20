@@ -78,10 +78,15 @@ final class PasskeyServer
         $this->clock = $clock ?? new NativeClock;
     }
 
-    /** The opaque, stable handle (32 bytes) the authenticator stores for an account. */
+    /**
+     * The opaque, stable handle the authenticator stores for an account: 64 hexadecimal characters,
+     * the longest WebAuthn allows. It is ASCII on purpose. laravel/passkeys reported (fix of
+     * 10 November 2026) that iOS Safari returns a handle of arbitrary bytes altered, after which a
+     * sign-in no longer matches; an ASCII handle survives that.
+     */
     public function userHandle(string $userId): string
     {
-        return hash_hmac('sha256', "passkey-user-handle\0".$userId, $this->userHandleSecret, true);
+        return hash_hmac('sha256', "passkey-user-handle\0".$userId, $this->userHandleSecret);
     }
 
     /** Starts registering a passkey for an account that is already signed in. */

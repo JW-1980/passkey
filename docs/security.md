@@ -13,7 +13,7 @@ What the library guarantees, what it leaves to the application, and why.
 | Replay | A ceremony is deleted when it is read; a response for another challenge fails verification |
 | Cross-purpose and cross-account use of a ceremony | The stored state carries its purpose and, for registration, the account; a mismatch answers `ceremony_expired` |
 | Cloned authenticator | When the authenticator uses a signature counter, a value that does not increase is refused. The stored counter never decreases under concurrent sign-ins |
-| Opaque user handle | The authenticator stores an HMAC-derived 32-byte handle, never the account ID or e-mail address |
+| Opaque user handle | The authenticator stores an HMAC-derived handle (64 hexadecimal characters), never the account ID or e-mail address. It is ASCII because iOS Safari is reported to alter handles of arbitrary bytes |
 | Server secrets at rest | The challenge table holds only the SHA-256 of ceremony IDs and handoff codes |
 | Passkey table | Public keys only. A leak of this table does not let anyone sign in |
 | Desktop handoff | Code only to `127.0.0.1`, bound to the app's PKCE challenge, single-use, 60 seconds; `state` checked in constant time by the app; the app's listener ignores anything that is not the exact callback |
@@ -28,6 +28,9 @@ What the library guarantees, what it leaves to the application, and why.
 - **Who may add a passkey.** The library requires a signed-in account. Whether a session that was
   opened with a password may add a passkey (and so reach passkey-level assurance) is the
   application's rule; enforce it with middleware on `register/*`.
+- **Whether the account may sign in at all.** The library verifies the passkey; it does not know
+  about blocked, unverified or suspended accounts. Check that where the sign-in is completed
+  (`CompletesLogin` in Laravel), and on every request for accounts blocked later.
 - **Recovery.** A person who loses every passkey needs another way in. The library has none on purpose.
 - **Removing the last passkey.** Allowed by the library; block it in the application if a passkey is
   the only way in.

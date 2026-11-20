@@ -62,8 +62,8 @@ final class PasskeyServerTest extends TestCase
 
         self::assertSame($first, $again);
         self::assertNotSame($first, $other);
-        self::assertSame(32, strlen((string) Base64Url::decode($first)));
-        self::assertStringNotContainsString('user-1', (string) Base64Url::decode($first));
+        // 64 ASCII characters: the WebAuthn maximum, and safe on platforms that mangle raw bytes.
+        self::assertMatchesRegularExpression('/^[0-9a-f]{64}$/', (string) Base64Url::decode($first));
     }
 
     public function test_every_ceremony_gets_its_own_challenge_and_id(): void
@@ -318,7 +318,7 @@ final class PasskeyServerTest extends TestCase
             'a registration client data type' => [fn (SoftPasskey $d, array $o) => $d->assert($o, Fixture::ORIGIN, type: 'webauthn.create')],
             'no user handle' => [fn (SoftPasskey $d, array $o) => $d->assert($o, Fixture::ORIGIN, sendUserHandle: false)],
             'the user handle of another account' => [function (SoftPasskey $d, array $o) {
-                $d->userHandle = hash_hmac('sha256', "passkey-user-handle\0user-2", Fixture::SECRET, true);
+                $d->userHandle = hash_hmac('sha256', "passkey-user-handle\0user-2", Fixture::SECRET);
 
                 return $d->assert($o, Fixture::ORIGIN);
             }],
