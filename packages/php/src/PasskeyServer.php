@@ -400,7 +400,7 @@ final class PasskeyServer
     private function steps(): CeremonyStepManagerFactory
     {
         $factory = new CeremonyStepManagerFactory;
-        $factory->setAllowedOrigins($this->relyingParty->origins);
+        $factory->setAllowedOrigins($this->relyingParty->allowedOrigins());
         $factory->setAlgorithmManager(Manager::create()->add(ES256::create(), RS256::create()));
         $factory->setAttestationStatementSupportManager($this->attestations());
 

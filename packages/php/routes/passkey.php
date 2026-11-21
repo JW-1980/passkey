@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Jw1980\Passkey\Laravel\Http\HandoffController;
 use Jw1980\Passkey\Laravel\Http\PasskeyController;
-use Jw1980\Passkey\Laravel\Http\WellKnownController;
 
 $auth = (array) config('passkey.routes.auth_middleware');
 
@@ -34,9 +33,4 @@ Route::prefix((string) config('passkey.routes.prefix'))->middleware('throttle:pa
     }
 });
 
-if (config('passkey.android.package') !== null && config('passkey.android.fingerprints') !== []) {
-    Route::get('.well-known/assetlinks.json', [WellKnownController::class, 'assetLinks'])->name('passkey.assetlinks');
-}
-if (config('passkey.apple.app_ids') !== []) {
-    Route::get('.well-known/apple-app-site-association', [WellKnownController::class, 'appleAppSiteAssociation'])->name('passkey.apple');
-}
+require __DIR__.'/well-known.php';

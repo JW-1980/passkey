@@ -16,17 +16,29 @@ use InvalidArgumentException;
  * - `android:apk-key-hash:<hash>` for a native Android app (see {@see WellKnown::androidOrigin()}).
  *
  * Native iOS apps send the `https://` origin of their associated domain and need no entry.
+ *
+ * **Related origins** (WebAuthn Level 3, "Related Origin Requests") are `https://` origins on
+ * *other* domains that may use the same passkeys, for example the sites of other products that sign
+ * in through one central relying party. The browser allows that only when
+ * `https://<id>/.well-known/webauthn` lists them; serve {@see WellKnown::relatedOrigins()} there.
  */
 final class RelyingParty
 {
     /** @var list<string> */
     public readonly array $origins;
 
-    /** @param list<string> $origins */
+    /** @var list<string> */
+    public readonly array $relatedOrigins;
+
+    /**
+     * @param  list<string>  $origins
+     * @param  list<string>  $relatedOrigins  `https://host[:port]` on other domains.
+     */
     public function __construct(
         public readonly string $id,
         public readonly string $name,
         array $origins,
+        array $relatedOrigins = [],
     ) {
         if (! self::isDomain($id)) {
             throw new InvalidArgumentException('The relying-party ID must be a lowercase domain name, not an address or a URL.');
@@ -42,6 +54,35 @@ final class RelyingParty
             $normalized[] = $this->normalize($origin);
         }
         $this->origins = array_values(array_unique($normalized));
+        $related = [];
+        foreach ($relatedOrigins as $origin) {
+            $related[] = self::normalizeRelated($origin);
+        }
+        $this->relatedOrigins = array_values(array_diff(array_unique($related), $this->origins));
+    }
+
+    /**
+     * Every origin whose WebAuthn responses are accepted.
+     *
+     * @return list<string>
+     */
+    public function allowedOrigins(): array
+    {
+        return array_values(array_merge($this->origins, $this->relatedOrigins));
+    }
+
+    private static function normalizeRelated(string $origin): string
+    {
+        $parts = parse_url(trim($origin));
+        $host = is_array($parts) ? strtolower($parts['host'] ?? '') : '';
+        if (! is_array($parts) || strtolower($parts['scheme'] ?? '') !== 'https' || ! self::isDomain($host)
+            || ($parts['path'] ?? '') !== '' && ($parts['path'] ?? '') !== '/'
+            || isset($parts['query']) || isset($parts['fragment']) || isset($parts['user']) || isset($parts['pass'])) {
+            throw new InvalidArgumentException("The related origin '{$origin}' must be https://host[:port] without a path.");
+        }
+        $port = isset($parts['port']) && $parts['port'] !== 443 ? ':'.$parts['port'] : '';
+
+        return 'https://'.$host.$port;
     }
 
     /** A relying party whose ID is the host of the application URL and whose only origin is that URL. */

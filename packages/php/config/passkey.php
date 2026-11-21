@@ -19,6 +19,8 @@ return [
         'id' => env('PASSKEY_RP_ID'),
         'name' => env('PASSKEY_RP_NAME'),
         'origins' => $list(env('PASSKEY_ORIGINS')),
+        /* https origins on other domains that may use these passkeys (served at /.well-known/webauthn). */
+        'related_origins' => $list(env('PASSKEY_RELATED_ORIGINS')),
     ],
 
     /*
@@ -38,6 +40,12 @@ return [
         'passkeys' => 'passkeys',
         'challenges' => 'passkey_challenges',
     ],
+
+    /*
+    | Run the package migration with `php artisan migrate`. Set to false when the application
+    | publishes it (`vendor:publish --tag=passkey-migrations`) and keeps it with its own migrations.
+    */
+    'load_migrations' => true,
 
     /* Auth guard for the signed-in account (null: the default guard). */
     'guard' => null,
@@ -90,4 +98,31 @@ return [
         'exchange_middleware' => [],
     ],
 
+    /*
+    | Firebase mode: this application is the auth hub of docs/functional-design.md. Signed-in routes
+    | take a Firebase ID token as bearer token (no session), a passkey sign-in and the desktop
+    | handoff answer a Firebase custom token, and the session routes above are not registered.
+    |
+    | `credentials` is the path of the service account JSON (outside the web root). With
+    | `emulator_host` (host:port of the Firebase Auth emulator) and a "demo-" project, no credentials
+    | are needed and unsigned emulator tokens are accepted; that combination cannot reach production.
+    */
+    'firebase' => [
+        'enabled' => (bool) env('PASSKEY_FIREBASE', false),
+        'project_id' => env('FIREBASE_PROJECT_ID'),
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+        'emulator_host' => env('FIREBASE_AUTH_EMULATOR_HOST'),
+        'recent_sign_in' => 600,
+        'custom_token_ttl' => 300,
+        /* Web origins whose pages may call the hub (CORS, without cookies). */
+        'cors_origins' => $list(env('PASSKEY_CORS_ORIGINS')),
+        /* Ask Firebase whether the user still exists before minting a token (needs credentials). */
+        'check_user_exists' => true,
+        /*
+        | Where Google's public keys are cached (null: the application's cache store). A file path
+        | must be in a directory only this application can write: the file is a trust anchor.
+        */
+        'key_cache' => env('FIREBASE_KEY_CACHE'),
+        'middleware' => [],
+    ],
 ];

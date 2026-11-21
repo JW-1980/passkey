@@ -1,8 +1,47 @@
 # passkey
 
-Passkey (WebAuthn) sign-in for a product with a backend, a browser app, a mobile app and a desktop
-app. One server package, one client package and two small native helpers, all speaking the same
-HTTP contract.
+The standard sign-in component for our web properties and apps: **Firebase Authentication** holds
+the accounts and the classic methods (email and password, email link, Google, Apple, …), and this
+repository adds **passkeys** on top and makes every platform — browser, Tauri desktop, Tauri
+Android, PHP sites — end with a Firebase session for the same user. Design:
+[`docs/functional-design.md`](docs/functional-design.md).
+
+It started as a passkey-only library, and that mode still works on its own: one server package,
+one client package and two small native helpers, all speaking the same HTTP contract.
+
+## With Firebase (the standard)
+
+| Part | Path | What it does |
+|---|---|---|
+| Auth hub | [`packages/php/src/Firebase`](packages/php/src/Firebase) | Verifies passkeys and answers Firebase **custom tokens**; registering and managing passkeys take a Firebase ID token as bearer. Framework-free (`AuthHub`) or Laravel (`PASSKEY_FIREBASE=true`) |
+| ID token verification, PHP | `Firebase\IdTokenVerifier`, Laravel middleware `firebase` | Every PHP backend trusts a sign-in locally and gives its own session |
+| Browser | [`packages/js/src/firebase.ts`](packages/js/src/firebase.ts) (`@jw-1980/passkey/firebase`) | Passkey sign-in ending in `signInWithCustomToken`; `exchangeIdToken` for the session step |
+| Rust (desktop, Android, backends) | [`packages/firebase`](packages/firebase) (`firebase-login`) | Firebase REST client, refreshing sessions, ID token verification, desktop sign-in through the system browser |
+
+```php
+$hub = new AuthHub(new FirebasePasskeys(
+    $passkeyServer, new HandoffServer($challenges),
+    new CustomTokenIssuer(ServiceAccount::fromFile('/etc/hub/firebase-service-account.json')),
+    IdTokenVerifier::forProject('my-project', new GoogleKeySource(cache: new FileKeyCache('/var/cache/hub/keys.json'))),
+    AdminClient::forServiceAccount($serviceAccount),
+), '/passkey', ['https://shop.example.nl'], new PdoRateLimiter($pdo));
+$hub->handle(HubRequest::fromGlobals())?->send();
+```
+
+```ts
+const passkeys = createFirebasePasskeys({ auth, signInWithCustomToken, hubUrl: 'https://login.example.nl/passkey', authenticator: browserAuthenticator() });
+await passkeys.register({ name: 'Laptop' });   // signed-in Firebase user, recent sign-in
+await passkeys.signIn();                        // → Firebase UserCredential
+```
+
+```rust
+let session = firebase_login::desktop::sign_in(&hub, &firebase, "https://login.example.nl/desktop", Default::default(),
+    |url| open_in_system_browser(url)).await?;   // any method in the browser → Firebase session in the app
+```
+
+A complete example against the Firebase Auth emulator: [`examples/firebase-hub`](examples/firebase-hub).
+
+## Passkeys without Firebase
 
 | Part | Path | For | Built on |
 |---|---|---|---|

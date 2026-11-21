@@ -81,4 +81,18 @@ final class WellKnown
 
         return (string) hex2bin($hex);
     }
+
+    /**
+     * Content of `/.well-known/webauthn` on the relying-party domain: the origins (of this and other
+     * domains) that may use its passkeys (WebAuthn Level 3, Related Origin Requests). Browsers that
+     * support it (Chromium 128+, Safari 18+) read at most five distinct registrable domains.
+     *
+     * @return array{origins: list<string>}
+     */
+    public static function relatedOrigins(RelyingParty $relyingParty): array
+    {
+        $web = array_values(array_filter($relyingParty->allowedOrigins(), static fn (string $o): bool => str_starts_with($o, 'https://')));
+
+        return ['origins' => $web];
+    }
 }
