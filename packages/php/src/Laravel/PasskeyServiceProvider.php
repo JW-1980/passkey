@@ -11,14 +11,27 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Jw1980\Passkey\Contracts\ChallengeStore;
 use Jw1980\Passkey\Contracts\CredentialStore;
+use Jw1980\Passkey\Firebase\AdminClient;
+use Jw1980\Passkey\Firebase\CustomTokenIssuer;
+use Jw1980\Passkey\Firebase\FileKeyCache;
+use Jw1980\Passkey\Firebase\FirebaseException;
+use Jw1980\Passkey\Firebase\FirebasePasskeys;
+use Jw1980\Passkey\Firebase\GoogleKeySource;
+use Jw1980\Passkey\Firebase\Http\AuthHub;
+use Jw1980\Passkey\Firebase\IdTokenVerifier;
+use Jw1980\Passkey\Firebase\MemoryKeyCache;
+use Jw1980\Passkey\Firebase\ProjectId;
+use Jw1980\Passkey\Firebase\ServiceAccount;
 use Jw1980\Passkey\Handoff\HandoffServer;
 use Jw1980\Passkey\Laravel\Contracts\CompletesHandoff;
 use Jw1980\Passkey\Laravel\Contracts\CompletesLogin;
 use Jw1980\Passkey\Laravel\Contracts\ResolvesPasskeyUser;
+use Jw1980\Passkey\Laravel\Http\Middleware\VerifyFirebaseToken;
 use Jw1980\Passkey\PasskeyException;
 use Jw1980\Passkey\PasskeyServer;
 use Jw1980\Passkey\RelyingParty;
@@ -50,6 +63,7 @@ final class PasskeyServiceProvider extends ServiceProvider
                 is_string($id) && $id !== '' ? $id : strtolower((string) parse_url($url, PHP_URL_HOST)),
                 (string) ($config['name'] ?? self::config($app)->get('app.name')),
                 $origins,
+                array_values(array_map('strval', (array) ($config['related_origins'] ?? []))),
             );
         });
 
@@ -74,6 +88,8 @@ final class PasskeyServiceProvider extends ServiceProvider
             (string) self::config($app)->get('passkey.handoff.callback_path'),
             (int) self::config($app)->get('passkey.handoff.code_ttl'),
         ));
+
+        $this->registerFirebase();
 
         $this->app->bind(ResolvesPasskeyUser::class, static fn (Application $app) => $app->make((string) self::config($app)->get('passkey.user_resolver')));
         $this->app->bind(CompletesLogin::class, static fn (Application $app) => $app->make((string) self::config($app)->get('passkey.login')));
@@ -106,9 +122,97 @@ final class PasskeyServiceProvider extends ServiceProvider
             $handler->dontReport(PasskeyException::class);
         }
 
-        if (config('passkey.routes.enabled') === true) {
-            $this->loadRoutesFrom(__DIR__.'/../../routes/passkey.php');
+        if (method_exists($handler, 'renderable')) {
+            $handler->renderable(static fn (FirebaseException $refusal): JsonResponse => new JsonResponse($refusal->toArray(), $refusal->httpStatus));
         }
+        $this->app->make(Router::class)->aliasMiddleware('firebase', VerifyFirebaseToken::class);
+
+        if (config('passkey.routes.enabled') === true) {
+            $this->loadRoutesFrom(__DIR__.'/../../routes/'.(config('passkey.firebase.enabled') === true ? 'firebase.php' : 'passkey.php'));
+        }
+    }
+
+    /**
+     * Firebase mode (docs/functional-design.md). The verifier and the middleware are available
+     * whenever a project ID is set, so that any Laravel application can verify ID tokens; the hub
+     * itself needs `passkey.firebase.enabled`.
+     */
+    private function registerFirebase(): void
+    {
+        $emulator = static function (Application $app): ?string {
+            $host = self::config($app)->get('passkey.firebase.emulator_host');
+
+            return is_string($host) && $host !== '' && ProjectId::isDemo(self::projectId($app)) ? $host : null;
+        };
+
+        $this->app->singleton(IdTokenVerifier::class, static function (Application $app) use ($emulator): IdTokenVerifier {
+            $project = self::projectId($app);
+            if ($emulator($app) !== null) {
+                return IdTokenVerifier::forEmulator($project);
+            }
+            $cache = self::config($app)->get('passkey.firebase.key_cache');
+
+            return IdTokenVerifier::forProject($project, new GoogleKeySource(
+                cache: is_string($cache) && $cache !== '' ? new FileKeyCache($cache) : new MemoryKeyCache,
+            ));
+        });
+
+        $this->app->singleton(ServiceAccount::class, static function (Application $app) use ($emulator): ServiceAccount {
+            $path = self::config($app)->get('passkey.firebase.credentials');
+            if (is_string($path) && $path !== '') {
+                $account = ServiceAccount::fromFile($path);
+                if ($account->projectId !== self::projectId($app)) {
+                    throw FirebaseException::configuration('FIREBASE_CREDENTIALS belongs to another project than FIREBASE_PROJECT_ID.');
+                }
+
+                return $account;
+            }
+            if ($emulator($app) !== null) {
+                return ServiceAccount::forEmulator(self::projectId($app));
+            }
+            throw FirebaseException::configuration('Set FIREBASE_CREDENTIALS to the service account JSON file.');
+        });
+
+        $this->app->singleton(AdminClient::class, static function (Application $app) use ($emulator): AdminClient {
+            $host = $emulator($app);
+
+            return $host !== null
+                ? AdminClient::forEmulator(self::projectId($app), $host)
+                : AdminClient::forServiceAccount($app->make(ServiceAccount::class));
+        });
+
+        $this->app->singleton(VerifyFirebaseToken::class, static function (Application $app): VerifyFirebaseToken {
+            $hasAdmin = self::config($app)->get('passkey.firebase.credentials') || self::config($app)->get('passkey.firebase.emulator_host');
+
+            return new VerifyFirebaseToken($app->make(IdTokenVerifier::class), $hasAdmin ? $app->make(AdminClient::class) : null);
+        });
+
+        $this->app->singleton(FirebasePasskeys::class, static fn (Application $app): FirebasePasskeys => new FirebasePasskeys(
+            $app->make(PasskeyServer::class),
+            $app->make(HandoffServer::class),
+            new CustomTokenIssuer($app->make(ServiceAccount::class), (int) self::config($app)->get('passkey.firebase.custom_token_ttl')),
+            $app->make(IdTokenVerifier::class),
+            self::config($app)->get('passkey.firebase.check_user_exists') === true ? $app->make(AdminClient::class) : null,
+            (int) self::config($app)->get('passkey.firebase.recent_sign_in'),
+        ));
+
+        $this->app->singleton(AuthHub::class, static fn (Application $app): AuthHub => new AuthHub(
+            $app->make(FirebasePasskeys::class),
+            '/'.trim((string) self::config($app)->get('passkey.routes.prefix'), '/'),
+            array_values(array_map('strval', (array) self::config($app)->get('passkey.firebase.cors_origins'))),
+            new LaravelRateLimiter($app->make(\Illuminate\Cache\RateLimiter::class)),
+            max(1, (int) self::config($app)->get('passkey.rate_limit')),
+        ));
+    }
+
+    private static function projectId(Application $app): string
+    {
+        $project = self::config($app)->get('passkey.firebase.project_id');
+        if (! is_string($project) || ! ProjectId::isValid($project)) {
+            throw FirebaseException::configuration('Set FIREBASE_PROJECT_ID to the Firebase project ID.');
+        }
+
+        return $project;
     }
 
     private static function config(Application $app): Repository
