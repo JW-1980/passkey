@@ -19,7 +19,8 @@ The packages are not published to a registry.
 
 The Composer manifest sits at the root of this repository, so the `vcs` form works; for a local
 checkout use `{ "type": "path", "url": "../passkey" }`. Then `composer require jw-1980/passkey`
-(until a version is tagged: `jw-1980/passkey:dev-main`).
+(until a version is tagged: `jw-1980/passkey:dev-ccr-bec2376c-lyaxky`, the only branch so far; there is no
+`main` yet, so `dev-main` does not resolve).
 
 **JavaScript** — `npm install ../passkey/packages/js` (run `npm run build` there first), or add it
 as a workspace package.
@@ -154,9 +155,10 @@ These notes describe what adopting the library means in each repository as it st
 
 - Laravel 12 with Inertia and Vue: the Laravel bridge and the browser client fit as they are.
   Use `laravelCsrfHeaders()`.
-- Its standard forbids SQLite as evidence. Run the PHP suite against MariaDB 11.8 with the
-  `PASSKEY_TEST_*` variables before reporting it as working there; `docs/status.md` says what was run.
-- Its `composer.json` requires PHP `^8.4.1`; the package supports PHP 8.3 and newer.
+- Its standard forbids SQLite as evidence and also requires MySQL 8.4. Run the PHP suite against
+  MariaDB 11.8 **and** MySQL 8.4 with the `PASSKEY_TEST_*` variables before reporting it as working
+  there; `docs/status.md` says what was run (MySQL 8.4 not yet).
+- Its `composer.json` requires PHP `^8.3`; the package supports PHP 8.3 and newer.
 
 ### welzolekker
 
@@ -164,5 +166,6 @@ These notes describe what adopting the library means in each repository as it st
 - The React Native app (Expo 58): add `react-native-passkey` (it needs a development build, not
   Expo Go) and use `bridgeAuthenticator(Passkey)`. The API routes need a token guard
   (`passkey.routes.middleware` and `passkey.login`), which the application must supply.
+- Its `composer.json` requires PHP `^8.4.1`; the package supports PHP 8.3 and newer.
 - Its guidelines say dependencies are not changed without approval: adding the package is the
   owner's call.
