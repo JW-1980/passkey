@@ -71,9 +71,16 @@ final class FirebaseException extends RuntimeException
      */
     public string $reason = '';
 
-    /** @return array{error: array{code: string, message: string}} */
+    /**
+     * What a client may see. A configuration error never shows its detail (environment variable
+     * names, project IDs): that stays in `getMessage()` for the server's log.
+     *
+     * @return array{error: array{code: string, message: string}}
+     */
     public function toArray(): array
     {
-        return ['error' => ['code' => $this->errorCode, 'message' => $this->getMessage()]];
+        $message = $this->errorCode === self::CONFIGURATION ? 'The sign-in service is not available.' : $this->getMessage();
+
+        return ['error' => ['code' => $this->errorCode, 'message' => $message]];
     }
 }

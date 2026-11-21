@@ -124,7 +124,13 @@ final class PasskeyServiceProvider extends ServiceProvider
         }
 
         if (method_exists($handler, 'renderable')) {
-            $handler->renderable(static fn (FirebaseException $refusal): JsonResponse => new JsonResponse($refusal->toArray(), $refusal->httpStatus));
+            $handler->renderable(static function (FirebaseException $refusal): JsonResponse {
+                if ($refusal->errorCode === FirebaseException::CONFIGURATION) {
+                    error_log('passkey: Firebase configuration error: '.$refusal->getMessage());
+                }
+
+                return new JsonResponse($refusal->toArray(), $refusal->httpStatus);
+            });
         }
         $this->app->make(Router::class)->aliasMiddleware('firebase', VerifyFirebaseToken::class);
 

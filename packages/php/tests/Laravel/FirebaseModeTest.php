@@ -45,7 +45,8 @@ final class FirebaseModeTest extends TestCase
     public function test_an_unknown_middleware_option_refuses_instead_of_switching_a_check_off(): void
     {
         $this->postJson('/typo', [], $this->bearer(['login_method' => 'passkey', 'login_mfa' => true, 'firebase' => ['sign_in_provider' => 'custom']]))
-            ->assertStatus(500)->assertJsonPath('error.code', 'configuration');
+            ->assertStatus(500)->assertJsonPath('error.code', 'configuration')
+            ->assertJsonPath('error.message', 'The sign-in service is not available.');
     }
 
     protected function tearDown(): void
