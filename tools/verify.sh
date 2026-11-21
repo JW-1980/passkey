@@ -42,6 +42,7 @@ if [[ -d packages/js/node_modules ]]; then
     run "js: tests" packages/js npm test --silent
     run "js: build" packages/js npm run -s build
     run "js: example bundle" packages/js npm run -s build:example
+    run "js: firebase example bundle" packages/js npm run -s build:firebase-example
 else
     skip "js" "run 'npm install' in packages/js"
 fi
@@ -52,6 +53,10 @@ if command -v cargo >/dev/null; then
     run "rust: lints" packages/desktop cargo clippy --all-targets -- -D warnings
     run "rust: tests" packages/desktop cargo test
     run "rust: example" packages/desktop cargo build --example handoff
+    run "rust firebase: format" packages/firebase cargo fmt --check
+    run "rust firebase: lints" packages/firebase cargo clippy --all-features --all-targets -- -D warnings
+    run "rust firebase: tests" packages/firebase cargo test --all-features
+    run "rust firebase: example" packages/firebase cargo build --features desktop --example desktop_sign_in
 else
     skip "rust" "cargo is not installed"
 fi
@@ -69,6 +74,14 @@ if [[ -f examples/plain-php/public/app.js && -x packages/php/vendor/bin/phpunit 
     run "end to end" . node --test e2e/passkey.e2e.mjs
 else
     skip "end to end" "needs the example bundle, the PHP dependencies and Playwright"
+fi
+# The Firebase tests (PHP EmulatorTest, Rust tests/emulator.rs, e2e/firebase.e2e.mjs) run against
+# the Firebase Auth emulator when FIREBASE_AUTH_EMULATOR_HOST is set; without it they skip.
+if [[ -n "${FIREBASE_AUTH_EMULATOR_HOST:-}" && -f examples/firebase-hub/public/app.js ]] \
+    && node -e "require('playwright')" 2>/dev/null; then
+    run "end to end: firebase" . node --test e2e/firebase.e2e.mjs
+else
+    skip "end to end: firebase" "needs FIREBASE_AUTH_EMULATOR_HOST (firebase emulators:start --only auth --project demo-passkey-test)"
 fi
 
 echo

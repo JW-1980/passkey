@@ -36,7 +36,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build:example": "esbuild ../../examples/plain-php/src/app.ts --bundle --format=esm --target=es2022 --outfile=../../examples/plain-php/public/app.js",
-    "build:firebase-example": "esbuild ../../examples/firebase-hub/src/app.ts --bundle --format=esm --target=es2022 --outfile=../../examples/firebase-hub/public/app.js"
+    "build:firebase-example": "NODE_PATH=node_modules esbuild ../../examples/firebase-hub/src/app.ts --bundle --format=esm --target=es2022 --outfile=../../examples/firebase-hub/public/app.js"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^14.0.0"

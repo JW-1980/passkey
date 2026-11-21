@@ -3,6 +3,28 @@
 What was executed, where, and what has never run. A result here describes the commit and the
 machine it ran on; run `tools/verify.sh` for a current one.
 
+## Executed on 21 November 2026 (Firebase)
+
+Machine: Linux x86-64 (cloud container), PHP 8.3.6, Node 22.23, Rust 1.97, headless Chromium,
+Firebase Auth emulator from `firebase-tools` 15.37.0 (project `demo-boekhouder`).
+
+| Part | What ran | Result |
+|---|---|---|
+| `packages/php` | PHPUnit, all suites: 196 tests (core, Firebase, Laravel 13.43 with Testbench 11), SQLite; with `FIREBASE_AUTH_EMULATOR_HOST` all 196 ran, without it the 2 emulator tests skip | passed |
+| `packages/php` | `EmulatorTest` with `FIREBASE_AUTH_EMULATOR_HOST`: our RS256 custom token accepted by the emulator, ID token for the same uid, claims kept after a refresh; admin lookup, disable, revoke and delete | passed |
+| `packages/php` | PHPStan 2.1.33 level 8 (phar, see below), Pint | no errors |
+| `packages/js` | TypeScript strict, Vitest: 74 tests (10 new for the Firebase adapter) | passed |
+| `packages/firebase` | `cargo test --all-features`: 19 tests (REST client, session manager, verifier with RS256 and a JWKS server, hub client, desktop sign-in with a fake hub) including 2 against the emulator; clippy `-D warnings`; rustfmt | passed, on Linux |
+| `packages/desktop` | `cargo test` (13 tests) | passed |
+| End to end | `e2e/firebase.e2e.mjs`: Chromium with a virtual authenticator, Firebase JS SDK 12 against the emulator, the PHP hub of `examples/firebase-hub`, the Rust `desktop_sign_in` example; 4 tests | passed |
+| End to end | `e2e/passkey.e2e.mjs` (the passkey-only mode), 9 tests | passed |
+
+Not executed on 21 November: MariaDB and MySQL (no server on the machine), Android (no SDK or NDK:
+`packages/firebase` was not compiled for an Android target), a real Firebase project (no
+credentials: the RS256 verification of real Google ID tokens is covered by unit tests with our own
+keys only), Laravel 12. PHPStan was installed as the phar of the `phpstan/phpstan` 2.1.33 git tag,
+because Composer could not download the dist archive through the proxy of the machine.
+
 ## Executed on 20 November 2026
 
 Machine: Linux x86-64 (cloud container), PHP 8.3.6, Node 22.23, Rust 1.97, JDK 21, headless Chromium.
@@ -32,7 +54,9 @@ Machine: Linux x86-64 (cloud container), PHP 8.3.6, Node 22.23, Rust 1.97, JDK 2
 | **Browsers other than Chromium** | Firefox and Safari were not run | Manual check, or Playwright with their engines (they have no virtual authenticator over CDP) |
 | **MySQL 8.4** | Only MariaDB 11.8.9 and SQLite ran. The MySQL table definition avoids `CREATE INDEX IF NOT EXISTS`, which MySQL lacks, but was not executed there | Run the suite with the `PASSKEY_TEST_*` variables |
 | **MariaDB 10.6 and 10.11** | Not run | Same |
-| **Inside the three applications** | Nothing in boekhouderv3, Nutricompare or welzolekker was changed or run | See `docs/integration.md` |
+| **A real Firebase project** | Only the emulator ran. The emulator signs nothing, so verifying Google's RS256 ID tokens with Google's live keys never ran | Create a project, set the service account, sign in once on each platform |
+| **`packages/firebase` on Android** | Not compiled for `aarch64-linux-android` | `cargo check --target aarch64-linux-android --features desktop` with the NDK, then inside the Tauri app |
+| **Inside the three applications** | boekhouderv3 got a design and server code (see its `docs/FIREBASE-INLOG-FO.md`); Nutricompare and welzolekker were not changed | See `docs/integration.md` |
 
 ## Open points
 

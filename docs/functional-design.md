@@ -186,7 +186,8 @@ A disabled or deleted Firebase user cannot get a session: Firebase refuses the c
 3. On that page the person signs in with **any** method (F1 or F3) and sees what they approve
    ("Sign in to <app> on this computer").
 4. On approval the page calls `POST {hub}/passkey/handoff/authorize` with the Firebase ID token as
-   bearer. The hub verifies it, records the uid and how the browser signed in, and answers the
+   bearer. The hub verifies it, requires a recent sign-in (FR-4), records the uid and how the
+   browser signed in, and answers the
    loopback address with a single-use code (60 seconds).
 5. The browser goes to the loopback address; the app checks `state`.
 6. The app calls `POST {hub}/passkey/handoff/exchange` with `{ code, code_verifier }`; the hub
@@ -259,7 +260,7 @@ anything itself.
 | FR-1 | The hub offers the HTTP contract of `docs/protocol.md`, extended in §9, under a configurable base path (default `/passkey`) |
 | FR-2 | `login/verify` answers a Firebase custom token for the uid of the passkey, and nothing else about the account |
 | FR-3 | Registering, listing, renaming, deleting passkeys and authorizing a handoff accept only a valid Firebase ID token of the **same project** as bearer |
-| FR-4 | Registering and deleting a passkey require a recent sign-in (default 600 s, configurable 60–3600) |
+| FR-4 | Registering and deleting a passkey, and authorizing a desktop/Android handoff, require a recent sign-in (default 600 s, configurable 60–3600) |
 | FR-5 | The custom token lifetime is configurable (60–3600 s, default 300) and carries the claims of §9.3 |
 | FR-6 | The handoff exchange answers a custom token for the uid that authorized it, with the browser's method in the claims |
 | FR-7 | PHP offers `IdTokenVerifier` that returns a `FirebaseIdentity` (uid, email, email verified, name, picture, sign-in provider, auth time, issue and expiry time, login method, multi-factor flag, all claims) or throws one exception type |
@@ -352,7 +353,7 @@ address or name is stored at the hub. Properties store the uid in their own user
 | MariaDB 10.6+, 11.8 | yes | 11.8 in the earlier passkey run |
 | SQLite | yes | yes |
 | Rust desktop (Windows, macOS, Linux) | yes | Linux only |
-| Rust on Android (Tauri 2) | yes (pure Rust, rustls) | compiled? see §18 |
+| Rust on Android (Tauri 2) | yes (pure Rust, rustls) | no: no Android toolchain on the test machine (§18) |
 | Browsers | Chromium, Firefox, Safari (Related Origin Requests: Chromium 128+ and Safari 18+; others use the hub page) | Chromium |
 
 ## 13. Failure behaviour
