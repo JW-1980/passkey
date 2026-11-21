@@ -425,11 +425,11 @@ project (§18).
 |---|---|---|
 | Q1 | One Firebase project for all properties, or one per property? | **One** for properties that share users (D1); a separate project only for a property that must never share accounts |
 | Q2 | Identity Platform (paid tier) for TOTP MFA, blocking functions and audit logs? | Yes for products that require MFA for some users (boekhouderv3 cloud); the free tier is enough otherwise |
-| Q3 | Allow sign-up with only a passkey (no email)? | No for now: recovery then needs a second method; revisit when synced passkeys are common among our users |
+| Q3 | Allow sign-up with only a passkey (no email)? | **Decided 21-11-2026 (boekhouderv3 FIREBASE-18): no**; every account keeps a second method (password or email link) |
 | Q4 | Where does the hub run, and on which domain? | On the domain whose registrable part becomes the `rpId` (for example `login.<brand>.nl`, `rpId = <brand>.nl`) |
-| Q5 | Android redirect: loopback or App Link? | Loopback first (same code as desktop); App Link when the Play policy or a device blocks it |
-| Q6 | Check revocation on every session exchange? | Yes at session exchange (one lookup per sign-in, not per request) for products with money or personal data |
-| Q7 | Bind passkey registration to proof inside the request (a passkey assertion or a Firebase re-authentication) instead of a recent bearer token? | Yes before production for products with money or personal data; it removes the residual risk of §8 |
+| Q5 | Android redirect: loopback or App Link? | **Decided 21-11-2026 (FIREBASE-19): loopback first**, an App Link only when needed |
+| Q6 | Check revocation on every session exchange? | **Decided 21-11-2026 (FIREBASE-20): yes at session exchange** for products with money or personal data |
+| Q7 | Bind passkey registration to proof inside the request (a passkey assertion or a Firebase re-authentication) instead of a recent bearer token? | **Decided 21-11-2026 (FIREBASE-17): yes, before production** for products with money or personal data. Not built yet |
 
 ## 18. What exists and what was executed
 
