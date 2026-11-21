@@ -1,0 +1,30 @@
+[package]
+name = "firebase-login"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+description = "Firebase Authentication for Rust apps and backends: REST client, session refresh, ID token verification and passkey sign-in through the auth hub (desktop handoff included)."
+license = "LicenseRef-Proprietary"
+publish = false
+
+[features]
+default = ["verify"]
+# ID token verification for Rust backends (RS256 against Google's public keys).
+verify = ["dep:jsonwebtoken"]
+# Desktop sign-in through the system browser (loopback + PKCE), via passkey-desktop.
+desktop = ["dep:passkey-desktop", "tokio/rt"]
+
+[dependencies]
+base64 = "0.22"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "time"] }
+jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto", "use_pem"], optional = true }
+passkey-desktop = { path = "../desktop", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+rsa = { version = "0.9", features = ["sha2"] }
+rand = "0.8"
+sha2 = "0.10"
