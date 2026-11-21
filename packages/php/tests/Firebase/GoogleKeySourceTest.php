@@ -70,6 +70,63 @@ final class GoogleKeySourceTest extends TestCase
         self::assertCount(2, $http->requests);
     }
 
+    public function test_the_refetch_limit_holds_across_instances_sharing_a_file_cache(): void
+    {
+        $path = sys_get_temp_dir().'/keys-'.bin2hex(random_bytes(4)).'.json';
+        try {
+            $http = $this->http();
+            for ($i = 0; $i < 5; $i++) {
+                // A new object per "request", as under PHP-FPM.
+                self::assertNull((new GoogleKeySource($http, new FileKeyCache($path), clock: $this->clock))->key('made-up-'.$i));
+            }
+            self::assertCount(1, $http->requests);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function test_a_failing_google_is_asked_at_most_once_a_minute_and_old_keys_stay_in_use(): void
+    {
+        $fail = false;
+        $calls = 0;
+        $http = new FakeHttp(function () use (&$fail, &$calls) {
+            $calls++;
+
+            return $fail ? new HttpResponse(503, [], '') : new HttpResponse(200, ['cache-control' => 'max-age=100'], (string) json_encode(['k1' => self::PEM]));
+        });
+        $cache = new MemoryKeyCache;
+        $source = new GoogleKeySource($http, $cache, clock: $this->clock);
+        self::assertSame(self::PEM, $source->key('k1'));
+
+        $fail = true;
+        $this->clock->sleep(101);
+        try {
+            $source->key('k1');
+            self::fail('no exception');
+        } catch (FirebaseException) {
+            $this->addToAssertionCount(1);
+        }
+        // Within the minute after the failed attempt: no new request, the last keys are used.
+        self::assertSame(self::PEM, (new GoogleKeySource($http, $cache, clock: $this->clock))->key('k1'));
+        self::assertSame(2, $calls);
+    }
+
+    public function test_a_cache_file_writable_by_others_is_ignored(): void
+    {
+        $path = sys_get_temp_dir().'/keys-'.bin2hex(random_bytes(4)).'.json';
+        try {
+            file_put_contents($path, (string) json_encode(['keys' => ['k1' => 'forged'], 'expiresAt' => PHP_INT_MAX, 'fetchedAt' => time()]));
+            chmod($path, 0666);
+            self::assertNull((new FileKeyCache($path))->get());
+            chmod($path, 0600);
+            $entry = (new FileKeyCache($path))->get();
+            self::assertNotNull($entry);
+            self::assertLessThanOrEqual(time() + 86400, $entry['expiresAt'], 'expiry is capped at a day');
+        } finally {
+            @unlink($path);
+        }
+    }
+
     public function test_failure_is_unavailable_not_a_refusal(): void
     {
         $source = new GoogleKeySource($this->http(status: 500), new MemoryKeyCache, clock: $this->clock);
@@ -91,9 +148,7 @@ final class GoogleKeySourceTest extends TestCase
 
     public function test_file_cache_is_shared_between_instances(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'keys');
-        self::assertIsString($path);
-        unlink($path);
+        $path = sys_get_temp_dir().'/keys-'.bin2hex(random_bytes(4)).'.json';
         try {
             $http = $this->http();
             (new GoogleKeySource($http, new FileKeyCache($path), clock: $this->clock))->key('k1');

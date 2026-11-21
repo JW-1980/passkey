@@ -39,6 +39,13 @@ final class FirebaseModeTest extends TestCase
 
             return ['uid' => $identity->uid, 'method' => $identity->method()];
         })->middleware('firebase:mfa');
+        $router->post('/typo', static fn () => ['ok' => true])->middleware('firebase:mfa, recnt=300');
+    }
+
+    public function test_an_unknown_middleware_option_refuses_instead_of_switching_a_check_off(): void
+    {
+        $this->postJson('/typo', [], $this->bearer(['login_method' => 'passkey', 'login_mfa' => true, 'firebase' => ['sign_in_provider' => 'custom']]))
+            ->assertStatus(500)->assertJsonPath('error.code', 'configuration');
     }
 
     protected function tearDown(): void

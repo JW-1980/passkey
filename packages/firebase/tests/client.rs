@@ -142,6 +142,8 @@ async fn configuration_guards() {
     assert!(HubClient::new("http://login.example/passkey").is_err());
     assert!(HubClient::new("https://login.example/passkey").is_ok());
     assert!(HubClient::new("http://127.0.0.1:8080/passkey").is_ok());
+    assert!(HubClient::new("http://localhost.attacker.example/passkey").is_err());
+    assert!(HubClient::new("http://127.0.0.1.nip.io/passkey").is_err());
 }
 
 #[tokio::test]

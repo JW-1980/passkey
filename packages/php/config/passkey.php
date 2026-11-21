@@ -41,6 +41,12 @@ return [
         'challenges' => 'passkey_challenges',
     ],
 
+    /*
+    | Run the package migration with `php artisan migrate`. Set to false when the application
+    | publishes it (`vendor:publish --tag=passkey-migrations`) and keeps it with its own migrations.
+    */
+    'load_migrations' => true,
+
     /* Auth guard for the signed-in account (null: the default guard). */
     'guard' => null,
 
@@ -112,7 +118,10 @@ return [
         'cors_origins' => $list(env('PASSKEY_CORS_ORIGINS')),
         /* Ask Firebase whether the user still exists before minting a token (needs credentials). */
         'check_user_exists' => true,
-        /* Where Google's public keys are cached between requests (null: per process only). */
+        /*
+        | Where Google's public keys are cached (null: the application's cache store). A file path
+        | must be in a directory only this application can write: the file is a trust anchor.
+        */
         'key_cache' => env('FIREBASE_KEY_CACHE'),
         'middleware' => [],
     ],

@@ -9,8 +9,10 @@ use Symfony\Component\Clock\NativeClock;
 
 /**
  * Google's public certificates for Firebase ID tokens, cached for the `max-age` Google sends (never
- * longer than 24 hours). An unknown key ID causes at most one extra fetch per minute, so a client
- * sending made-up key IDs cannot make the server hammer Google.
+ * longer than 24 hours). Across all processes that share the {@see KeyCache}, at most one fetch per
+ * minute happens (also for unknown key IDs, after the cache expired, and while Google fails), so a
+ * client sending made-up key IDs cannot make the server hammer Google. Within that minute the last
+ * keys keep being used.
  */
 final class GoogleKeySource implements KeySource
 {
@@ -23,8 +25,6 @@ final class GoogleKeySource implements KeySource
     private const REFETCH_INTERVAL = 60;
 
     private readonly ClockInterface $clock;
-
-    private int $lastFetch = 0;
 
     public function __construct(
         private readonly HttpClient $http = new CurlHttpClient,
@@ -39,24 +39,33 @@ final class GoogleKeySource implements KeySource
     {
         $now = $this->clock->now()->getTimestamp();
         $cached = $this->cache->get();
-        if ($cached !== null && $cached['expiresAt'] > $now) {
-            if (isset($cached['keys'][$kid])) {
+        if ($cached !== null) {
+            $fresh = $cached['expiresAt'] > $now;
+            if ($fresh && isset($cached['keys'][$kid])) {
                 return $cached['keys'][$kid];
             }
-            if ($now - $this->lastFetch < self::REFETCH_INTERVAL) {
-                return null;
+            if ($now - $cached['fetchedAt'] < self::REFETCH_INTERVAL) {
+                if ($cached['keys'] === []) {
+                    throw FirebaseException::unavailable('Google public keys, recent fetch failed');
+                }
+
+                return $cached['keys'][$kid] ?? null;
             }
         }
 
-        $keys = $this->fetch($now);
+        $keys = $this->fetch($now, $cached);
 
         return $keys[$kid] ?? null;
     }
 
-    /** @return array<string, string> */
-    private function fetch(int $now): array
+    /**
+     * @param  array{keys: array<string, string>, expiresAt: int, fetchedAt: int}|null  $previous
+     * @return array<string, string>
+     */
+    private function fetch(int $now, ?array $previous): array
     {
-        $this->lastFetch = $now;
+        // Record the attempt first: a failing or slow Google must not be asked again by every request.
+        $this->cache->put($previous['keys'] ?? [], $previous['expiresAt'] ?? 0, $now);
         $response = $this->http->request('GET', $this->url, ['Accept' => 'application/json']);
         if ($response->status !== 200) {
             throw FirebaseException::unavailable('Google public keys, HTTP '.$response->status);
@@ -75,7 +84,7 @@ final class GoogleKeySource implements KeySource
             throw FirebaseException::unavailable('Google public keys, no keys in the answer');
         }
         $ttl = min(self::MAX_CACHE, max(0, $response->maxAge() ?? self::DEFAULT_CACHE));
-        $this->cache->put($keys, $now + $ttl);
+        $this->cache->put($keys, $now + $ttl, $now);
 
         return $keys;
     }

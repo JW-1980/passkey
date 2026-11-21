@@ -24,7 +24,6 @@ use Jw1980\Passkey\Firebase\FirebasePasskeys;
 use Jw1980\Passkey\Firebase\GoogleKeySource;
 use Jw1980\Passkey\Firebase\Http\AuthHub;
 use Jw1980\Passkey\Firebase\IdTokenVerifier;
-use Jw1980\Passkey\Firebase\MemoryKeyCache;
 use Jw1980\Passkey\Firebase\ProjectId;
 use Jw1980\Passkey\Firebase\ServiceAccount;
 use Jw1980\Passkey\Handoff\HandoffServer;
@@ -107,7 +106,9 @@ final class PasskeyServiceProvider extends ServiceProvider
     {
         $this->publishes([__DIR__.'/../../config/passkey.php' => $this->app->configPath('passkey.php')], 'passkey-config');
         $this->publishesMigrations([__DIR__.'/../../database/migrations' => $this->app->databasePath('migrations')], 'passkey-migrations');
-        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+        if (config('passkey.load_migrations') !== false) {
+            $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+        }
 
         RateLimiter::for('passkey', static fn (Request $request): Limit => Limit::perMinute(
             max(1, (int) config('passkey.rate_limit')),
@@ -153,7 +154,7 @@ final class PasskeyServiceProvider extends ServiceProvider
             $cache = self::config($app)->get('passkey.firebase.key_cache');
 
             return IdTokenVerifier::forProject($project, new GoogleKeySource(
-                cache: is_string($cache) && $cache !== '' ? new FileKeyCache($cache) : new MemoryKeyCache,
+                cache: is_string($cache) && $cache !== '' ? new FileKeyCache($cache) : new LaravelKeyCache($app->make(\Illuminate\Contracts\Cache\Repository::class)),
             ));
         });
 

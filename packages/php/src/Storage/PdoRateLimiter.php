@@ -66,8 +66,13 @@ final class PdoRateLimiter implements RateLimiter
         }
         try {
             $pdo->prepare("INSERT INTO {$this->table} (key_hash, window_start, hits) VALUES (?, ?, 1)")->execute([$hash, $window]);
-        } catch (\PDOException) {
-            // The row exists, so the limit is reached (or another request just created it).
+        } catch (\PDOException $failure) {
+            // SQLSTATE 23000: the row exists, so the limit is reached (or another request just
+            // created it). Anything else is a real database fault and is not hidden as a 429.
+            if ($failure->getCode() !== '23000') {
+                throw $failure;
+            }
+
             return false;
         }
         // Old windows are useless; remove some of them now and then.

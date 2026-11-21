@@ -19,6 +19,17 @@ Firebase Auth emulator from `firebase-tools` 15.37.0 (project `demo-boekhouder`)
 | End to end | `e2e/firebase.e2e.mjs`: Chromium with a virtual authenticator, Firebase JS SDK 12 against the emulator, the PHP hub of `examples/firebase-hub`, the Rust `desktop_sign_in` example; 4 tests | passed |
 | End to end | `e2e/passkey.e2e.mjs` (the passkey-only mode), 9 tests | passed |
 
+**Security review (21 November).** A separate read-only reviewer found no token verification bypass
+and seven points. Resolved: the handoff reset the sign-in time (HIGH; now `login_auth_time`), the
+refetch limit for Google's keys did not hold across PHP-FPM requests (MEDIUM; now in the shared cache,
+the Laravel default is the cache store), unknown middleware options were ignored (LOW), the Rust key
+cache held its lock during the fetch and had no limit after expiry (LOW), the key cache file was
+trusted unconditionally (LOW), the Rust hub URL check was a string prefix (LOW), time arithmetic could
+overflow in Rust and `PdoRateLimiter` hid database errors as 429 (INFORMATIONAL). Reported, not
+solved: ID tokens seen by a property backend can be replayed at the hub within the recent-sign-in
+window (functional design §8, Q7). After the fixes: PHPUnit 201 tests (6 with the emulator), Rust 21
+tests, the 4 Firebase end-to-end tests, PHPStan level 8 and Pint all passed.
+
 Not executed on 21 November: MariaDB and MySQL (no server on the machine), Android (no SDK or NDK:
 `packages/firebase` was not compiled for an Android target), a real Firebase project (no
 credentials: the RS256 verification of real Google ID tokens is covered by unit tests with our own

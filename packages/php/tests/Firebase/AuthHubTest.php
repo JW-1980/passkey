@@ -249,7 +249,7 @@ final class AuthHubTest extends TestCase
         self::assertSame(200, $exchange->status, $exchange->body);
         $token = Jwt::decode(self::json($exchange)['firebase']['customToken']);
         self::assertSame('firebase-uid-1', $token['payload']['uid']);
-        self::assertSame(['login_method' => 'handoff', 'login_via' => 'password', 'login_mfa' => false], $token['payload']['claims']);
+        self::assertSame(['login_method' => 'handoff', 'login_via' => 'password', 'login_mfa' => false, 'login_auth_time' => $this->now() - 30], $token['payload']['claims']);
     }
 
     public function test_handoff_from_a_passkey_session_stays_multi_factor(): void
@@ -258,7 +258,24 @@ final class AuthHubTest extends TestCase
         $authorize = $this->call('POST', '/passkey/handoff/authorize', ['challenge' => self::CHALLENGE, 'port' => 51234, 'state' => self::STATE], $token);
         parse_str((string) parse_url((string) self::json($authorize)['redirect'], PHP_URL_QUERY), $query);
         $claims = Jwt::decode(self::json($this->call('POST', '/passkey/handoff/exchange', ['code' => $query['code'], 'code_verifier' => self::VERIFIER]))['firebase']['customToken'])['payload']['claims'];
-        self::assertSame(['login_method' => 'handoff', 'login_via' => 'passkey', 'login_mfa' => true], $claims);
+        self::assertSame(['login_method' => 'handoff', 'login_via' => 'passkey', 'login_mfa' => true, 'login_auth_time' => $this->now() - 30], $claims);
+    }
+
+    public function test_a_handoff_keeps_the_browser_sign_in_time_so_recency_cannot_be_laundered(): void
+    {
+        // The browser signed in 500 s ago: recent enough to authorize, not much longer.
+        $browser = $this->idToken(['auth_time' => $this->now() - 500]);
+        $authorize = $this->call('POST', '/passkey/handoff/authorize', ['challenge' => self::CHALLENGE, 'port' => 51234, 'state' => self::STATE], $browser);
+        parse_str((string) parse_url((string) self::json($authorize)['redirect'], PHP_URL_QUERY), $query);
+        $claims = Jwt::decode(self::json($this->call('POST', '/passkey/handoff/exchange', ['code' => $query['code'], 'code_verifier' => self::VERIFIER]))['firebase']['customToken'])['payload']['claims'];
+        self::assertSame($this->now() - 500, $claims['login_auth_time']);
+
+        // Firebase would issue the app an ID token with auth_time = now and these claims.
+        $this->fixture->clock->sleep(200);
+        $appToken = $this->idToken(['auth_time' => $this->now(), 'firebase' => ['sign_in_provider' => 'custom']] + $claims);
+        $again = $this->call('POST', '/passkey/handoff/authorize', ['challenge' => self::CHALLENGE, 'port' => 51234, 'state' => self::STATE], $appToken);
+        self::assertSame(403, $again->status, 'the handed-off token is 700 s old in sign-in terms');
+        self::assertSame(403, $this->call('POST', '/passkey/register/options', [], $appToken)->status);
     }
 
     public function test_handoff_needs_a_recent_sign_in(): void

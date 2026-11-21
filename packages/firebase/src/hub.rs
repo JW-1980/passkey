@@ -36,10 +36,15 @@ impl HubClient {
     /// With the application's own HTTP client.
     pub fn with_http(base_url: &str, http: reqwest::Client) -> Result<Self, Error> {
         let base = base_url.trim_end_matches('/').to_owned();
-        let secure = base.starts_with("https://")
-            || ["http://127.0.0.1", "http://localhost", "http://[::1]"]
-                .iter()
-                .any(|p| base.starts_with(p));
+        let parsed = reqwest::Url::parse(&base)
+            .map_err(|_| Error::Configuration("the hub URL is not a URL".into()))?;
+        let loopback = matches!(
+            parsed.host(),
+            Some(url::Host::Domain("localhost"))
+                | Some(url::Host::Ipv4(std::net::Ipv4Addr::LOCALHOST))
+                | Some(url::Host::Ipv6(std::net::Ipv6Addr::LOCALHOST))
+        );
+        let secure = parsed.scheme() == "https" || (parsed.scheme() == "http" && loopback);
         if !secure {
             return Err(Error::Configuration(
                 "the hub URL must use https (http only on a loopback host)".into(),

@@ -35,6 +35,8 @@ pub struct FirebaseIdentity {
     pub email_verified: bool,
     /// Display name, if any.
     pub name: Option<String>,
+    /// Profile picture URL, if any.
+    pub picture: Option<String>,
     /// `firebase.sign_in_provider`: `password`, `google.com`, `custom`, …
     pub sign_in_provider: String,
     /// `firebase.sign_in_second_factor` (`totp`, `phone`), if Firebase MFA was used.
@@ -83,9 +85,21 @@ impl FirebaseIdentity {
             }
     }
 
-    /// True when the person signed in at most `seconds` ago.
+    /// When the person really signed in: for a handoff the browser's sign-in time
+    /// (`login_auth_time`), so a handoff never makes an old sign-in look recent again.
+    pub fn effective_auth_time(&self) -> i64 {
+        match (
+            self.login_method(),
+            self.claims.get("login_auth_time").and_then(Value::as_i64),
+        ) {
+            (Some("handoff"), Some(original)) => self.auth_time.min(original),
+            _ => self.auth_time,
+        }
+    }
+
+    /// True when the person signed in (not refreshed, not handed off) at most `seconds` ago.
     pub fn is_recent(&self, seconds: i64) -> bool {
-        now() - self.auth_time <= seconds
+        now().saturating_sub(self.effective_auth_time()) <= seconds
     }
 }
 
@@ -235,10 +249,13 @@ impl IdTokenVerifier {
         if claims.get("aud").and_then(Value::as_str) != Some(self.project_id.as_str()) {
             return Err(Error::InvalidToken("wrong aud"));
         }
-        if exp + SKEW <= now {
+        if exp.saturating_add(SKEW) <= now {
             return Err(Error::InvalidToken("expired"));
         }
-        if iat - SKEW > now || auth_time - SKEW > now || auth_time > iat + SKEW {
+        if iat.saturating_sub(SKEW) > now
+            || auth_time.saturating_sub(SKEW) > now
+            || auth_time > iat.saturating_add(SKEW)
+        {
             return Err(Error::InvalidToken("issued in the future"));
         }
         let sub = claims
@@ -270,6 +287,7 @@ impl IdTokenVerifier {
             email: text("email"),
             email_verified: claims.get("email_verified") == Some(&Value::Bool(true)),
             name: text("name"),
+            picture: text("picture"),
             sign_in_provider: provider,
             second_factor,
             auth_time,
@@ -284,66 +302,84 @@ impl IdTokenVerifier {
             Keys::Static(map) => Ok(map.get(kid).cloned()),
             Keys::Emulator => Ok(None),
             Keys::Google { url, http, cache } => {
-                let mut cache = cache.lock().await;
-                let fresh = cache.expires.is_some_and(|e| e > Instant::now());
-                if fresh {
-                    if let Some(key) = cache.keys.get(kid) {
-                        return Ok(Some(key.clone()));
+                {
+                    let mut guard = cache.lock().await;
+                    let fresh = guard.expires.is_some_and(|e| e > Instant::now());
+                    if fresh {
+                        if let Some(key) = guard.keys.get(kid) {
+                            return Ok(Some(key.clone()));
+                        }
                     }
-                    if cache
+                    // At most one fetch a minute, also after expiry and while Google fails; in
+                    // between, the last keys stay in use.
+                    if guard
                         .last_fetch
                         .is_some_and(|t| t.elapsed() < REFETCH_INTERVAL)
                     {
-                        return Ok(None);
-                    }
-                }
-                cache.last_fetch = Some(Instant::now());
-                let response = http
-                    .get(url)
-                    .send()
-                    .await
-                    .map_err(|e| Error::Unavailable(e.without_url().to_string()))?;
-                if !response.status().is_success() {
-                    return Err(Error::Unavailable(format!(
-                        "HTTP {}",
-                        response.status().as_u16()
-                    )));
-                }
-                let max_age = response
-                    .headers()
-                    .get("cache-control")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(max_age)
-                    .unwrap_or(3600);
-                let set: Value = response
-                    .json()
-                    .await
-                    .map_err(|e| Error::Unavailable(e.without_url().to_string()))?;
-                let mut keys = HashMap::new();
-                for jwk in set
-                    .get("keys")
-                    .and_then(Value::as_array)
-                    .into_iter()
-                    .flatten()
-                {
-                    let field = |n: &str| jwk.get(n).and_then(Value::as_str);
-                    if let (Some(kid), Some("RSA"), Some(n), Some(e)) =
-                        (field("kid"), field("kty"), field("n"), field("e"))
-                    {
-                        if let Ok(key) = DecodingKey::from_rsa_components(n, e) {
-                            keys.insert(kid.to_owned(), key);
+                        if guard.keys.is_empty() {
+                            return Err(Error::Unavailable("recent fetch failed".into()));
                         }
+                        return Ok(guard.keys.get(kid).cloned());
                     }
+                    guard.last_fetch = Some(Instant::now());
                 }
-                if keys.is_empty() {
-                    return Err(Error::Unavailable("no keys in the answer".into()));
-                }
-                cache.keys = keys;
-                cache.expires = Some(Instant::now() + Duration::from_secs(max_age).min(MAX_CACHE));
-                Ok(cache.keys.get(kid).cloned())
+                // The lock is not held during the request, so verifications with cached keys
+                // never wait for Google.
+                let (keys, max_age) = fetch_keys(http, url).await?;
+                let mut guard = cache.lock().await;
+                guard.keys = keys;
+                guard.expires = Some(Instant::now() + Duration::from_secs(max_age).min(MAX_CACHE));
+                Ok(guard.keys.get(kid).cloned())
             }
         }
     }
+}
+
+async fn fetch_keys(
+    http: &reqwest::Client,
+    url: &str,
+) -> Result<(HashMap<String, DecodingKey>, u64), Error> {
+    let response = http
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| Error::Unavailable(e.without_url().to_string()))?;
+    if !response.status().is_success() {
+        return Err(Error::Unavailable(format!(
+            "HTTP {}",
+            response.status().as_u16()
+        )));
+    }
+    let max_age = response
+        .headers()
+        .get("cache-control")
+        .and_then(|v| v.to_str().ok())
+        .and_then(max_age)
+        .unwrap_or(3600);
+    let set: Value = response
+        .json()
+        .await
+        .map_err(|e| Error::Unavailable(e.without_url().to_string()))?;
+    let mut keys = HashMap::new();
+    for jwk in set
+        .get("keys")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let field = |n: &str| jwk.get(n).and_then(Value::as_str);
+        if let (Some(kid), Some("RSA"), Some(n), Some(e)) =
+            (field("kid"), field("kty"), field("n"), field("e"))
+        {
+            if let Ok(key) = DecodingKey::from_rsa_components(n, e) {
+                keys.insert(kid.to_owned(), key);
+            }
+        }
+    }
+    if keys.is_empty() {
+        return Err(Error::Unavailable("no keys in the answer".into()));
+    }
+    Ok((keys, max_age))
 }
 
 fn check(project_id: &str) -> Result<(), Error> {

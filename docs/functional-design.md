@@ -292,6 +292,17 @@ anything itself.
 | SR-10 | The hub rate-limits `login/options`, `login/verify` and `handoff/exchange` per IP (default 30 per minute) |
 | SR-11 | Error answers never say whether an account or a passkey exists (`invalid_passkey` for every sign-in failure) |
 | SR-12 | The bearer token is accepted only in the `Authorization` header, never in a query string or cookie |
+| SR-13 | The cache of Google's keys is a trust anchor: it is shared by all processes (a file in a private directory, or the framework cache) and a cache file that another user or group can write is ignored |
+| SR-14 | Middleware options are checked; an unknown option is a configuration error, never a silently skipped check |
+
+**Residual risk (reported, not solved).** An ID token is a bearer token for every audience of the
+project. A property backend that receives a fresh ID token (F6) could, within the recent-sign-in
+window, register a passkey for that user at the hub or authorize a handoff. The window is short
+(600 s, from the original sign-in, SR-6 and `login_auth_time`) and properties are our own services,
+but properties are therefore not isolated from the hub. Never log ID tokens. A stronger design asks
+for a passkey assertion or a Firebase re-authentication inside the registration request itself
+(open question Q7). Likewise, SR-7 holds only while no other principal of the Firebase project
+(default `firebase-adminsdk` account, Cloud Functions) mints custom tokens.
 
 ## 9. HTTP contract (additions to `docs/protocol.md`)
 
@@ -316,6 +327,7 @@ anything itself.
 | `login_method` | `passkey`, `handoff` | How the hub authenticated this sign-in |
 | `login_via` | the browser's `sign_in_provider` (`password`, `google.com`, `passkey`, …) | Only for `handoff` |
 | `login_mfa` | `true` / `false` | `true` for a passkey, and for a handoff whose browser session was a passkey or Firebase MFA |
+| `login_auth_time` | seconds since the epoch | Only for `handoff`: when the browser really signed in. Recency checks use the earlier of this and `auth_time`, so a handoff never makes an old sign-in look recent again |
 
 ### 9.4 Account deletion (server to server)
 
@@ -417,6 +429,7 @@ project (§18).
 | Q4 | Where does the hub run, and on which domain? | On the domain whose registrable part becomes the `rpId` (for example `login.<brand>.nl`, `rpId = <brand>.nl`) |
 | Q5 | Android redirect: loopback or App Link? | Loopback first (same code as desktop); App Link when the Play policy or a device blocks it |
 | Q6 | Check revocation on every session exchange? | Yes at session exchange (one lookup per sign-in, not per request) for products with money or personal data |
+| Q7 | Bind passkey registration to proof inside the request (a passkey assertion or a Firebase re-authentication) instead of a recent bearer token? | Yes before production for products with money or personal data; it removes the residual risk of §8 |
 
 ## 18. What exists and what was executed
 

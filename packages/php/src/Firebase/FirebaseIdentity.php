@@ -71,10 +71,25 @@ final class FirebaseIdentity
         return $login === 'passkey' || ($login === 'handoff' && ($this->claims['login_mfa'] ?? false) === true);
     }
 
-    /** True when the person signed in (not refreshed) at most this many seconds ago. */
+    /**
+     * When the person really signed in. For a desktop/Android handoff this is the time of the
+     * browser sign-in (`login_auth_time`), not the time the app exchanged its custom token: a
+     * handoff must never make an old sign-in look recent again.
+     */
+    public function effectiveAuthTime(): int
+    {
+        $original = $this->claims['login_auth_time'] ?? null;
+        if ($this->loginMethod() === 'handoff' && is_int($original)) {
+            return min($this->authTime, $original);
+        }
+
+        return $this->authTime;
+    }
+
+    /** True when the person signed in (not refreshed, not handed off) at most this many seconds ago. */
     public function isRecent(int $seconds): bool
     {
-        return $this->now - $this->authTime <= $seconds;
+        return $this->now - $this->effectiveAuthTime() <= $seconds;
     }
 
     /** A display name for the passkey prompt: the email address, else the name, else the uid. */

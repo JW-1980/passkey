@@ -186,6 +186,35 @@ async fn passkey_claims_count_only_for_custom_sign_ins() {
 }
 
 #[tokio::test]
+async fn a_handoff_keeps_the_browser_sign_in_time() {
+    let now = now();
+    let identity = verifier()
+        .verify(&token(json!({ "auth_time": now - 5, "login_method": "handoff", "login_via": "password",
+            "login_mfa": false, "login_auth_time": now - 700, "firebase": { "sign_in_provider": "custom" } })))
+        .await
+        .expect("valid");
+    assert_eq!(identity.effective_auth_time(), now - 700);
+    assert!(!identity.is_recent(600));
+    // The claim means nothing outside a custom sign-in.
+    let other = verifier()
+        .verify(&token(json!({ "auth_time": now - 5, "login_method": "handoff", "login_auth_time": now - 700 })))
+        .await
+        .expect("valid");
+    assert!(other.is_recent(600));
+}
+
+#[tokio::test]
+async fn extreme_times_do_not_panic() {
+    // Only that it returns (a debug build panics on an overflow); the values are signed nonsense.
+    for claims in [
+        json!({ "exp": i64::MAX, "iat": i64::MIN, "auth_time": i64::MIN }),
+        json!({ "exp": i64::MIN, "iat": i64::MAX, "auth_time": i64::MAX }),
+    ] {
+        let _ = verifier().verify(&token(claims)).await;
+    }
+}
+
+#[tokio::test]
 async fn keys_come_from_the_jwks_and_are_cached() {
     let public = keys().0.to_public_key();
     let jwks = json!({ "keys": [{

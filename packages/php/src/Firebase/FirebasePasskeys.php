@@ -125,6 +125,7 @@ final class FirebasePasskeys
         return $this->handoff->authorize($identity->uid, $challenge, $port, $state, [
             'via' => $identity->method(),
             'mfa' => $identity->isMultiFactor(),
+            'authTime' => $identity->effectiveAuthTime(),
         ]);
     }
 
@@ -137,6 +138,8 @@ final class FirebasePasskeys
             'login_method' => 'handoff',
             'login_via' => $via,
             'login_mfa' => ($grant->context['mfa'] ?? false) === true,
+            // The browser sign-in time travels along, so recency checks keep using it (SR-6).
+            'login_auth_time' => is_int($grant->context['authTime'] ?? null) ? $grant->context['authTime'] : 0,
         ]);
     }
 

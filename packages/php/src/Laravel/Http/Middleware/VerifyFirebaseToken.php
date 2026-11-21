@@ -42,6 +42,11 @@ final class VerifyFirebaseToken
             }
             $identity = $this->verifier->verify($match[1]);
             foreach ($options as $option) {
+                $option = trim($option);
+                if ($option !== 'mfa' && $option !== 'active' && preg_match('/^recent=[1-9]\d{0,5}$/', $option) !== 1) {
+                    // A typo must never switch a protection off silently.
+                    throw FirebaseException::configuration("Unknown option '{$option}' of the firebase middleware.");
+                }
                 if ($option === 'mfa' && ! $identity->isMultiFactor()) {
                     return new JsonResponse(['error' => ['code' => 'mfa_required', 'message' => 'Sign in with a passkey or a second factor.']], 403);
                 }
