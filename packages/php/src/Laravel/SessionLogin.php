@@ -22,6 +22,7 @@ final class SessionLogin implements CompletesLogin
 
     public function __construct(private readonly AuthFactory $auth) {}
 
+    /** @return array<string, mixed> */
     public function complete(Request $request, AuthenticationResult $result): array
     {
         $guard = $this->auth->guard(config('passkey.guard'));

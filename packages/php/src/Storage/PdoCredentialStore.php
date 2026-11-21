@@ -46,7 +46,7 @@ final class PdoCredentialStore implements CredentialStore
         $statement = $this->pdo()->prepare('SELECT '.self::COLUMNS." FROM {$this->table} WHERE user_id = ? ORDER BY created_at, credential_hash");
         $statement->execute([$userId]);
 
-        return array_map(self::passkey(...), $statement->fetchAll(PDO::FETCH_ASSOC));
+        return array_values(array_map(self::passkey(...), $statement->fetchAll(PDO::FETCH_ASSOC)));
     }
 
     public function countForUser(string $userId): int
