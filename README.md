@@ -86,7 +86,7 @@ Details and the reasons: [`docs/security.md`](docs/security.md).
 ### Laravel
 
 ```bash
-composer require jw-1980/passkey      # from this repository, see docs/integration.md
+composer require jw-1980/passkey:^0.1  # stable tag v0.1.0 on main; see docs/integration.md
 php artisan migrate
 ```
 
@@ -164,6 +164,14 @@ let grant = handoff.wait()?;            // blocks; cancel with handoff.cancel_ha
 
 Per-platform steps, including Android and the association files: [`docs/integration.md`](docs/integration.md).
 The HTTP contract: [`docs/protocol.md`](docs/protocol.md).
+
+## Versions
+
+The first stable tag is **`v0.1.0`** (26 November 2026) on `main`. Require `^0.1` in Composer. Before
+`v1.0.0` a **minor** release may change the public API; a patch release does not. The tag points at
+the commit whose checks are listed in [`docs/status.md`](docs/status.md); nothing is published to
+Packagist, so every consumer adds this repository as a `vcs` repository (see
+[`docs/integration.md`](docs/integration.md)).
 
 ## Verifying
 

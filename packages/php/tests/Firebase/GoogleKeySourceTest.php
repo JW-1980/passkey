@@ -72,6 +72,9 @@ final class GoogleKeySourceTest extends TestCase
 
     public function test_the_refetch_limit_holds_across_instances_sharing_a_file_cache(): void
     {
+        if (PHP_OS_FAMILY === 'Windows') {
+            self::markTestSkipped('FileKeyCache verifies POSIX permissions; Windows reports mode 0666 for every file.');
+        }
         $path = sys_get_temp_dir().'/keys-'.bin2hex(random_bytes(4)).'.json';
         try {
             $http = $this->http();
@@ -113,6 +116,9 @@ final class GoogleKeySourceTest extends TestCase
 
     public function test_a_cache_file_writable_by_others_is_ignored(): void
     {
+        if (PHP_OS_FAMILY === 'Windows') {
+            self::markTestSkipped('FileKeyCache verifies POSIX permissions; Windows reports mode 0666 for every file.');
+        }
         $path = sys_get_temp_dir().'/keys-'.bin2hex(random_bytes(4)).'.json';
         try {
             file_put_contents($path, (string) json_encode(['keys' => ['k1' => 'forged'], 'expiresAt' => PHP_INT_MAX, 'fetchedAt' => time()]));
@@ -148,6 +154,9 @@ final class GoogleKeySourceTest extends TestCase
 
     public function test_file_cache_is_shared_between_instances(): void
     {
+        if (PHP_OS_FAMILY === 'Windows') {
+            self::markTestSkipped('FileKeyCache verifies POSIX permissions; Windows reports mode 0666 for every file.');
+        }
         $path = sys_get_temp_dir().'/keys-'.bin2hex(random_bytes(4)).'.json';
         try {
             $http = $this->http();

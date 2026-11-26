@@ -17,6 +17,9 @@ final class CurlHttpClient implements HttpClient
         if (! function_exists('curl_init')) {
             throw FirebaseException::configuration('ext-curl is needed for the default HTTP client.');
         }
+        if ($method === '') {
+            throw FirebaseException::configuration('The HTTP method must not be empty.');
+        }
         $handle = curl_init($url);
         if ($handle === false) {
             throw FirebaseException::unavailable('HTTP');

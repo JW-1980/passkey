@@ -3,6 +3,31 @@
 What was executed, where, and what has never run. A result here describes the commit and the
 machine it ran on; run `tools/verify.sh` for a current one.
 
+## Version
+
+The first stable tag is **`v0.1.0`** (26 November 2026) on `main`. The checks below were run on
+20 and 21 November 2026 on Linux; the PHP suite, PHPStan and the JavaScript and Rust checks were
+repeated on Windows x64 on 26 November 2026 before the tag.
+
+## Executed on 26 November 2026 (before v0.1.0)
+
+Machine: Windows x64, PHP 8.5.3, Node 24.14.0, Rust 1.97.1. Same tree as the tag.
+
+| Part | What ran | Result |
+|---|---|---|
+| `packages/php` | PHPUnit, all suites: 202 tests, 855 assertions, SQLite; 5 skipped: 2 emulator tests (`FIREBASE_AUTH_EMULATOR_HOST` not set) and 3 `FileKeyCache` tests (see below) | passed |
+| `packages/php` | PHPStan level 8 (2.3.7) over `src`, `config`, `routes`, `database` | no errors |
+| `packages/php` | Pint (1.32.3) `--test` | **not clean on Windows**: the checkout uses CRLF (`core.autocrlf=true`), so Pint reports `line_ending` for almost every file, plus a few brace rules on anonymous classes; the committed blobs are LF. Not reformatted, so the tag's diff stays about the version |
+| `packages/js` | TypeScript 5.9 strict, Vitest, 74 tests, build | passed |
+| `packages/desktop` | `cargo fmt --check`, clippy with `-D warnings`, `cargo test` (13 tests) | passed, on Windows |
+| `packages/firebase` | `cargo fmt --check`, clippy with `--all-features -D warnings`, `cargo test --all-features` (21 tests) | passed, on Windows |
+| Android and both end-to-end suites | Not repeated on Windows (no Android SDK; Playwright and the Firebase emulator not installed in this checkout) | not run |
+
+**Windows and `FileKeyCache`.** The three skipped tests prove that a cache file is not writable by
+group or others. `fileperms()` on Windows reports `0666` for every file, so the cache is never
+trusted there and those tests cannot pass; the library's PHP deployment target (and CI evidence) is
+Linux. The tests skip on Windows with that reason instead of pretending the permission check ran.
+
 ## Executed on 21 November 2026 (Firebase)
 
 Machine: Linux x86-64 (cloud container), PHP 8.3.6, Node 22.23, Rust 1.97, headless Chromium,

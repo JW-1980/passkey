@@ -18,9 +18,9 @@ The packages are not published to a registry.
 ```
 
 The Composer manifest sits at the root of this repository, so the `vcs` form works; for a local
-checkout use `{ "type": "path", "url": "../passkey" }`. Then `composer require jw-1980/passkey`
-(until a version is tagged: `jw-1980/passkey:dev-ccr-bec2376c-lyaxky`, the only branch so far; there is no
-`main` yet, so `dev-main` does not resolve).
+checkout use `{ "type": "path", "url": "../passkey" }`. Then `composer require jw-1980/passkey:^0.1`
+(the first stable tag is **`v0.1.0`** on `main`; Composer reads the tag through the `vcs` repository).
+To follow unreleased work, require `dev-main` instead of a version.
 
 **JavaScript** — `npm install ../passkey/packages/js` (run `npm run build` there first), or add it
 as a workspace package.
@@ -155,6 +155,8 @@ These notes describe what adopting the library means in each repository as it st
 
 - Laravel 12 with Inertia and Vue: the Laravel bridge and the browser client fit as they are.
   Use `laravelCsrfHeaders()`.
+- Require the stable tag: `jw-1980/passkey:^0.1` (tag `v0.1.0` on `main`), with the `vcs` repository
+  from §1. Do not require the old branch `dev-ccr-bec2376c-lyaxky`.
 - Its standard forbids SQLite as evidence and also requires MySQL 8.4. Run the PHP suite against
   MariaDB 11.8 **and** MySQL 8.4 with the `PASSKEY_TEST_*` variables before reporting it as working
   there; `docs/status.md` says what was run (MySQL 8.4 not yet).
@@ -163,6 +165,8 @@ These notes describe what adopting the library means in each repository as it st
 ### welzolekker
 
 - Laravel 13 with Blade: the Laravel bridge fits; load the browser client from the Vite bundle.
+- Require the stable tag: `jw-1980/passkey:^0.1` (tag `v0.1.0` on `main`), with the `vcs` repository
+  from §1. Do not require the old branch `dev-ccr-bec2376c-lyaxky`.
 - The React Native app (Expo 58): add `react-native-passkey` (it needs a development build, not
   Expo Go) and use `bridgeAuthenticator(Passkey)`. The API routes need a token guard
   (`passkey.routes.middleware` and `passkey.login`), which the application must supply.
