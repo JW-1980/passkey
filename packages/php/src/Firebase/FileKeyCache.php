@@ -53,6 +53,13 @@ final class FileKeyCache implements KeyCache
     private function trusted(): bool
     {
         clearstatcache(true, $this->path);
+        if (PHP_OS_FAMILY === 'Windows') {
+            // Windows has no POSIX mode bits: fileperms() reports 0666 for every file, so the
+            // group/other check would reject every cache file. Access is controlled by ACLs,
+            // which are outside this class; the caller still chooses a directory only the
+            // application's user can write (see the class comment).
+            return is_file($this->path);
+        }
         $mode = @fileperms($this->path);
         if ($mode === false || ($mode & 0o022) !== 0) {
             return false;

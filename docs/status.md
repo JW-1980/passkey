@@ -5,9 +5,23 @@ machine it ran on; run `tools/verify.sh` for a current one.
 
 ## Version
 
-The first stable tag is **`v0.1.0`** (26 November 2026) on `main`. The checks below were run on
-20 and 21 November 2026 on Linux; the PHP suite, PHPStan and the JavaScript and Rust checks were
-repeated on Windows x64 on 26 November 2026 before the tag.
+The first stable tag is **`v0.1.0`** (26 November 2026) on `main`; **`v0.1.1`** (27 November
+2026) adds the Windows fixes below. The checks below were run on 20 and 21 November 2026 on Linux;
+the PHP suite, PHPStan and the JavaScript and Rust checks were repeated on Windows x64 on 26 and
+27 November 2026.
+
+## Executed on 27 November 2026 (before v0.1.1)
+
+Machine: Windows x64, PHP 8.5.3, Node 24.14.0.
+
+| Part | What ran | Result |
+|---|---|---|
+| `packages/php` | PHPUnit, all suites: 202 tests, 863 assertions, SQLite; 3 skipped: 2 emulator tests (`FIREBASE_AUTH_EMULATOR_HOST` not set) and 1 `FileKeyCache` permission test (see below) | passed |
+| `packages/php` | PHPStan level 8 (2.3.7) over `src`, `config`, `routes`, `database` | no errors |
+| `packages/php` | Pint (1.32.3) `--test` | **clean**: `.gitattributes` forces LF on checkout, so the line-ending difference is gone |
+
+The JavaScript, Rust and end-to-end checks were not repeated in this round; their 26 November results
+below still describe the tree before `v0.1.1`, except for `FileKeyCache` and `.gitattributes`.
 
 ## Executed on 26 November 2026 (before v0.1.0)
 
@@ -23,10 +37,13 @@ Machine: Windows x64, PHP 8.5.3, Node 24.14.0, Rust 1.97.1. Same tree as the tag
 | `packages/firebase` | `cargo fmt --check`, clippy with `--all-features -D warnings`, `cargo test --all-features` (21 tests) | passed, on Windows |
 | Android and both end-to-end suites | Not repeated on Windows (no Android SDK; Playwright and the Firebase emulator not installed in this checkout) | not run |
 
-**Windows and `FileKeyCache`.** The three skipped tests prove that a cache file is not writable by
-group or others. `fileperms()` on Windows reports `0666` for every file, so the cache is never
-trusted there and those tests cannot pass; the library's PHP deployment target (and CI evidence) is
-Linux. The tests skip on Windows with that reason instead of pretending the permission check ran.
+**Windows and `FileKeyCache`.** `fileperms()` on Windows reports `0666` for every file, so the
+group/other check would reject every cache file. Since `v0.1.1` the cache accepts a regular file on
+Windows and leaves the access control to the directory's ACLs (the class comment says the caller must
+choose a directory only the application's user can write). The two sharing/refetch tests now run on
+Windows. The test that proves a file writable by group or others is ignored still skips on Windows:
+there are no POSIX mode bits to chmod, and the ACL variant is not covered. That is one skip, not
+three; the test does not pretend the POSIX check ran.
 
 ## Executed on 21 November 2026 (Firebase)
 

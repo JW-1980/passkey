@@ -1,0 +1,13 @@
+# Normaliseer tekst naar LF, ook op Windows. Pint en de migratiechecksum gaan uit van LF;
+# zonder deze regel maakt een Windows-checkout er CRLF van en faalt `pint --test` op elk bestand.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.zip binary
+*.phar binary
+*.woff binary
+*.woff2 binary
