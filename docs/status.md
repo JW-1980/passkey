@@ -6,7 +6,8 @@ machine it ran on; run `tools/verify.sh` for a current one.
 ## Version
 
 The first stable tag is **`v0.1.0`** (26 November 2026) on `main`; **`v0.1.1`** (27 November
-2026) adds the Windows fixes below. The checks below were run on 20 and 21 November 2026 on Linux;
+2026) adds the Windows fixes below, and **`v0.1.2`** is a documentation patch that scopes the
+`FileKeyCache` trust-anchor text to POSIX. The checks below were run on 20 and 21 November 2026 on Linux;
 the PHP suite, PHPStan and the JavaScript and Rust checks were repeated on Windows x64 on 26 and
 27 November 2026.
 
@@ -22,6 +23,7 @@ Machine: Windows x64, PHP 8.5.3, Node 24.14.0.
 
 The JavaScript, Rust and end-to-end checks were not repeated in this round; their 26 November results
 below still describe the tree before `v0.1.1`, except for `FileKeyCache` and `.gitattributes`.
+`v0.1.2` changes only the class comment and SR-13 wording; no behaviour and no test result changed.
 
 ## Executed on 26 November 2026 (before v0.1.0)
 
