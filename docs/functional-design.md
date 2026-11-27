@@ -292,7 +292,7 @@ anything itself.
 | SR-10 | The hub rate-limits `login/options`, `login/verify` and `handoff/exchange` per IP (default 30 per minute) |
 | SR-11 | Error answers never say whether an account or a passkey exists (`invalid_passkey` for every sign-in failure) |
 | SR-12 | The bearer token is accepted only in the `Authorization` header, never in a query string or cookie |
-| SR-13 | The cache of Google's keys is a trust anchor: it is shared by all processes (a file in a private directory, or the framework cache) and a cache file that another user or group can write is ignored |
+| SR-13 | The cache of Google's keys is a trust anchor: it is shared by all processes (a file in a private directory, or the framework cache). On POSIX a cache file owned by another user or writable by group or others is ignored; on Windows there are no POSIX mode bits, so the caller must protect the directory with ACLs |
 | SR-14 | Middleware options are checked; an unknown option is a configuration error, never a silently skipped check |
 
 **Residual risk (reported, not solved).** An ID token is a bearer token for every audience of the

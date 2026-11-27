@@ -9,7 +9,9 @@ namespace Jw1980\Passkey\Firebase;
  * and rename).
  *
  * The file is a trust anchor (see {@see KeyCache}): put it in a directory only the application's
- * user can write. A file owned by another user, or writable by group or others, is ignored.
+ * user can write. On POSIX a file owned by another user, or writable by group or others, is
+ * ignored. Windows has no POSIX mode bits (`fileperms()` reports 0666 for every file), so there the
+ * caller must protect the directory with ACLs; the class only checks that the path is a regular file.
  */
 final class FileKeyCache implements KeyCache
 {
